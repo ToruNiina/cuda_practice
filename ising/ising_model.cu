@@ -58,8 +58,9 @@ __global__
 void update_field(bool* spins, const float* random,
         const std::size_t x_size, const std::size_t y_size, bool turn)
 {
-    const int x = blockIdx.x;
-    const int y = blockIdx.y;
+    const int x = threadIdx.x + blockIdx.x * blockDim.x;
+    const int y = threadIdx.y + blockIdx.y * blockDim.y;
+
     if(turn)
     {
         if((x+y)%2 == 1) return;
@@ -69,7 +70,7 @@ void update_field(bool* spins, const float* random,
         if((x+y)%2 == 0) return;
     }
 
-    const std::size_t xdim = gridDim.x;
+    const std::size_t xdim = blockDim.x * gridDim.x;
     const std::size_t offset = x + y * xdim;
     if(offset >= x_size * y_size) return;
 
@@ -216,8 +217,8 @@ int main(int argc, char **argv)
         assert(st_genrnd == CURAND_STATUS_SUCCESS);
 
         // update spins
-        dim3 blocks(w, h);
-        dim3 threads(1);
+        dim3 blocks(w/16, h/16);
+        dim3 threads(16, 16);
         update_field<<<blocks, threads>>>(spins, random, w, h, true);
         update_field<<<blocks, threads>>>(spins, random, w, h, false);
     }

@@ -72,13 +72,13 @@ write_mandelbrot(
 
 int main()
 {
-    const double rmin = -1.05;
-    const double rmax = -1.0;
-    const double imin =  0.23;
-    const double imax =  0.28;
-    const std::size_t threshold = 2000;
-    const std::size_t x_dim = 4096;
-    const std::size_t y_dim = 4096;
+    const double rmin = -2.0;
+    const double rmax =  1.0;
+    const double imin = -1.5;
+    const double imax =  1.5;
+    const std::size_t threshold = 400;
+    const std::size_t x_dim = 1024;
+    const std::size_t y_dim = 1024;
 
     bool* mandelbrot;
     cudaError_t ermalloc = cudaMalloc((void**)&mandelbrot, x_dim * y_dim);
@@ -86,6 +86,7 @@ int main()
 
     dim3 blocks(x_dim/32, y_dim/32);
     dim3 threads(32, 32);
+
     write_mandelbrot<double><<<blocks, threads>>>(
             mandelbrot, rmin, rmax, imin, imax, threshold, x_dim, y_dim);
 

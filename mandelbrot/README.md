@@ -2,7 +2,7 @@ mandelbrot
 ====
 
 require libpng++.
-```sh
+```sh:ubuntu
 sudo apt-get install libpng++-dev
 ```
 
@@ -11,3 +11,7 @@ sudo apt-get install libpng++-dev
 ### mandelbrot.cu
 
 naive implementation
+
+### mandelbrot\_thrust.cu
+
+using thrust c++ library

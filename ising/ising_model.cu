@@ -185,6 +185,11 @@ int main(int argc, char **argv)
     assert(cpy_init == 0);
     std::cerr << "initial state copied" << std::endl;
 
+#if defined(OUTPUT_TEXT)
+    std::ofstream ofs("ising_traj.dat");
+    char *traj = new char[w * h];
+#endif
+
     for(std::size_t i=0; i<step; ++i)
     {
 #ifdef OUTPUT_PNG
@@ -210,15 +215,26 @@ int main(int argc, char **argv)
             }
         }
         image.write(filename.str().c_str());
-#endif //OUTPUT_PNG
+
+#elif defined(OUTPUT_TEXT)
+
+        cudaError_t ercpy = cudaMemcpy(
+                snapshot, spins, sizeof(bool) * w * h, cudaMemcpyDeviceToHost);
+        assert(ercpy == 0);
+
+        for(std::size_t i=0; i<w*h; ++i)
+            traj[i] = static_cast<char>(snapshot[i]) + 48;
+        ofs << traj << std::endl;
+
+#endif //OUTPUT
 
         // generate random numbers
         curandStatus_t st_genrnd = curandGenerateUniform(rng, random, w * h);
         assert(st_genrnd == CURAND_STATUS_SUCCESS);
 
         // update spins
-        dim3 blocks(w/16, h/16);
-        dim3 threads(16, 16);
+        dim3 blocks(w/32, h/32);
+        dim3 threads(32, 32);
         update_field<<<blocks, threads>>>(spins, random, w, h, true);
         update_field<<<blocks, threads>>>(spins, random, w, h, false);
     }

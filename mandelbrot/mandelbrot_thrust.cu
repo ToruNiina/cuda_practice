@@ -1,21 +1,31 @@
 #include <thrust/complex.h>
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
-
+#include <thrust/iterator/counting_iterator.h>
 #include <png++/png.hpp>
 
 template<typename realT>
-struct judge_mandelbrot
+struct mandelbrot
 {
-    const std::size_t threshold;
+    typedef realT real_type;
+    typedef thrust::complex<real_type> complex_type;
 
-    judge_mandelbrot(const std::size_t th): threshold(th){}
+    mandelbrot(const std::size_t th,
+               const std::size_t Nr, const std::size_t Ni,
+               const real_type dr, const real_type di,
+               const complex_type& min)
+        : threshold_(th), num_r_(Nr), num_i_(Ni), dr_(dr), di_(di), min_(min)
+    {}
 
     __host__ __device__
-    bool operator()(const thrust::complex<realT>& z) const
+    bool operator()(const std::size_t& idx) const
     {
+        const std::size_t r_idx = idx / num_i_;
+        const std::size_t i_idx = idx % num_r_;
+        const complex_type z(min_ + complex_type(r_idx * dr_, i_idx * di_));
+
         thrust::complex<realT> x(0., 0.);
-        for(std::size_t i=0; i<threshold; ++i)
+        for(std::size_t i=0; i<threshold_; ++i)
         {
             x = x * x + z;
             if(thrust::abs(x) > 2.)
@@ -23,52 +33,39 @@ struct judge_mandelbrot
         }
         return true;
     }
+
+    const std::size_t threshold_, num_r_, num_i_;
+    const real_type dr_, di_;
+    const complex_type min_;
 };
 
 int main()
 {
     const thrust::complex<double> min(-2.0, -1.5);
     const thrust::complex<double> max( 1.0,  1.5);
-    const std::size_t threshold    =  200;
-    const std::size_t r_resolution = 1024;
-    const std::size_t i_resolution = 1024;
-    const std::size_t size = r_resolution * i_resolution;
-    const double dr = (max.real() - min.real()) / r_resolution;
-    const double di = (max.imag() - min.imag()) / i_resolution;
-    std::cerr << "dr = " << dr << std::endl;
-    std::cerr << "di = " << di << std::endl;
+    const std::size_t threshold =  200;
+    const std::size_t num_r     = 1024;
+    const std::size_t num_i     = 1024;
+    const std::size_t size = num_r * num_i;
+    const double dr = (max.real() - min.real()) / num_r;
+    const double di = (max.imag() - min.imag()) / num_i;
 
-    // generate complex plane
-    thrust::host_vector<thrust::complex<double>> host_plane(size);
-    for(std::size_t i=0; i<r_resolution; ++i)
-    {
-        for(std::size_t j=0; j<i_resolution; ++j)
-        {
-            const thrust::complex<double> val =
-                min + thrust::complex<double>(dr * i, di * j);
-            const std::size_t offset = i + r_resolution * j;
-            host_plane[offset] = val;
-        }
-    }
-    std::cerr << "complex plane generated" << std::endl;
-
-    thrust::device_vector<thrust::complex<double>> complex_plane = host_plane;
-    std::cerr << "complex plane copied" << std::endl;
-
-    judge_mandelbrot<double> judge(threshold);
+    thrust::counting_iterator<std::size_t> begin(0);
+    thrust::counting_iterator<std::size_t> end(size);
     thrust::device_vector<bool> is_mandelbrot(size);
-    thrust::transform(complex_plane.begin(), complex_plane.end(),
-            is_mandelbrot.begin(), judge);
-    std::cerr << "calculation end" << std::endl;
+
+    const mandelbrot<double> judge(threshold, num_r, num_i, dr, di, min);
+
+    thrust::transform(begin, end, is_mandelbrot.begin(), judge);
 
     thrust::host_vector<bool> host_is_mandelbrot = is_mandelbrot;
 
-    png::image<png::rgb_pixel> image(r_resolution, i_resolution);
-    for(std::size_t i=0; i<r_resolution; ++i)
+    png::image<png::rgb_pixel> image(num_r, num_i);
+    for(std::size_t i=0; i<num_r; ++i)
     {
-        for(std::size_t j=0; j<i_resolution; ++j)
+        for(std::size_t j=0; j<num_i; ++j)
         {
-            const std::size_t offset = i + r_resolution * j;
+            const std::size_t offset = i + num_r * j;
 
             if(host_is_mandelbrot[offset])
                 image[i][j] = png::rgb_pixel(255, 0, 0);
